@@ -36,7 +36,7 @@ jobs:
         run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results
@@ -69,7 +69,7 @@ jobs:
         run: dotnet pack src/TempTrimmer/TempTrimmer.csproj --configuration Release --no-restore --output nupkg
 
       - name: Upload NuGet package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nupkg
           path: nupkg/*.nupkg
@@ -87,10 +87,10 @@ jobs:
 
     steps:
       - name: Download NuGet package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nupkg
-          path: nupkg
+          path: .
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
@@ -107,4 +107,5 @@ jobs:
             core.setOutput('token', token);
 
       - name: Publish to NuGet.org
+        shell: bash
         run: dotnet nuget push nupkg/*.nupkg --api-key ${{ steps.nuget-token.outputs.token }} --source https://api.nuget.org/v3/index.json --skip-duplicate
