@@ -1,0 +1,33 @@
+.log-entry .card-body {
+    border-left: 4px solid transparent;
+}
+
+.table-warning .card-body { border-left-color: #ffc107; }
+.table-danger  .card-body { border-left-color: #dc3545; }
+.table-secondary .card-body { border-left-color: #adb5bd; }
+
+.log-message {
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.display-6 {
+    font-size: 2rem;
+}
+
+code {
+    font-size: 0.85em;
+}
+
+details > summary {
+    list-style: none;
+    user-select: none;
+}
+details > summary::before {
+    content: "▶ ";
+    font-size: 0.7em;
+}
+details[open] > summary::before {
+    content: "▼ ";
+}

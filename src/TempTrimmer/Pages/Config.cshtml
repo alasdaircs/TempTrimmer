@@ -1,0 +1,137 @@
+@page
+@model ConfigModel
+@{
+    ViewData["Title"] = "Configuration";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1 class="h3 mb-4">Configuration</h1>
+
+        @if (TempData["Message"] is string msg)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @msg
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+            <div class="card mb-3">
+                <div class="card-header">Deletion Policy</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Max File Age</label>
+                        <p class="text-muted small mb-2">
+                            Files not accessed or modified within this period will be deleted.
+                        </p>
+                        <div class="input-group" style="max-width:320px;">
+                            <input asp-for="Form.MaxAgeDays" type="number" min="0" max="365"
+                                   class="form-control" placeholder="Days" />
+                            <span class="input-group-text">days</span>
+                            <input asp-for="Form.MaxAgeHours" type="number" min="0" max="23"
+                                   class="form-control" placeholder="Hours" />
+                            <span class="input-group-text">hours</span>
+                        </div>
+                        <span asp-validation-for="Form.MaxAgeDays" class="text-danger small"></span>
+                        <span asp-validation-for="Form.MaxAgeHours" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.MaxTotalSizeMb" class="form-label fw-semibold">
+                            Max Total Size (MB)
+                        </label>
+                        <p class="text-muted small mb-2">
+                            If the total temp folder size exceeds this threshold, the oldest files
+                            are deleted until it falls within the limit.
+                        </p>
+                        <div class="input-group" style="max-width:240px;">
+                            <input asp-for="Form.MaxTotalSizeMb" type="number" min="1" max="102400"
+                                   class="form-control" />
+                            <span class="input-group-text">MB</span>
+                        </div>
+                        <span asp-validation-for="Form.MaxTotalSizeMb" class="text-danger small"></span>
+                        <p class="text-muted small mt-1">
+                            @(Model.Form.MaxTotalSizeMb > 0
+                                ? $"≈ {Model.Form.MaxTotalSizeMb / 1024.0:F2} GB"
+                                : string.Empty)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Scheduler</div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label asp-for="Form.ScanIntervalMinutes" class="form-label fw-semibold">
+                            Scan Interval (minutes)
+                        </label>
+                        <p class="text-muted small mb-2">
+                            How often the background service runs automatically.
+                        </p>
+                        <div class="input-group" style="max-width:200px;">
+                            <input asp-for="Form.ScanIntervalMinutes" type="number" min="1" max="1440"
+                                   class="form-control" />
+                            <span class="input-group-text">min</span>
+                        </div>
+                        <span asp-validation-for="Form.ScanIntervalMinutes" class="text-danger small"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">API Access</div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label asp-for="Form.ApiKey" class="form-label fw-semibold">API Key</label>
+                        <p class="text-muted small mb-2">
+                            Callers must supply this value in the <code>X-Api-Key</code> request header
+                            when calling <code>POST /api/trim</code>. Leave blank to disable authentication
+                            on the endpoint (not recommended on a public-facing site).
+                        </p>
+                        <div class="input-group" style="max-width:480px;">
+                            <input asp-for="Form.ApiKey" type="password" id="apiKeyInput"
+                                   class="form-control font-monospace" autocomplete="new-password" />
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="toggleApiKeyVisibility()">Show</button>
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="generateApiKey()">Regenerate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-page="/Config" class="btn btn-outline-secondary ms-2">Reset</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('apiKeyInput');
+            const btn = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function generateApiKey() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            const key = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+            const input = document.getElementById('apiKeyInput');
+            input.type = 'text';
+            input.value = key;
+            input.nextElementSibling.textContent = 'Hide';
+        }
+    </script>
+}

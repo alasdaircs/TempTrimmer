@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AcsSolutions.TempTrimmer</RootNamespace>
+    <AssemblyName>TempTrimmer</AssemblyName>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- NuGet / Site Extension metadata -->
+    <IsPackable>true</IsPackable>
+    <PackageId>AcsSolutions.TempTrimmer</PackageId>
+    <Title>TempTrimmer — Azure App Service Temp Folder Manager</Title>
+    <Version>1.0.0</Version>
+    <Authors>ACS Solutions</Authors>
+    <Copyright>Copyright © ACS Solutions 2026</Copyright>
+    <Description>Azure Windows App Service Site Extension that automatically deletes aged and over-quota files from the temp folder. Configurable age threshold (default 72 h) and size quota (default 1 GB) with a Kudu admin dashboard, structured Serilog logging, and a REST trigger endpoint.</Description>
+    <PackageTags>AzureSiteExtension TempTrimmer temp cleanup Azure AppService Windows</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/alasdaircs/TempTrimmer</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/alasdaircs/TempTrimmer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <!-- Suppress default web build output from pack; we include publish output instead -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeContentInPack>false</IncludeContentInPack>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- Publish output directory used by the pack target below -->
+    <SiteExtensionPublishDir>$(MSBuildProjectDirectory)/publish/</SiteExtensionPublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Site Extension IIS transform -->
+    <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
+    <!-- NuGet package root assets -->
+    <None Include="$(MSBuildThisFileDirectory)../../icon.png" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="" Condition="Exists('$(MSBuildThisFileDirectory)../../README.md')" />
+  </ItemGroup>
+
+  <!-- Publish the web app into publish/ before collecting package files -->
+  <Target Name="PublishForPack" BeforeTargets="_GetPackageFiles" Condition="'$(NoBuild)' != 'true'">
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(SiteExtensionPublishDir);SelfContained=false" />
+  </Target>
+
+  <!-- Include published output in content/ folder of the NuGet package -->
+  <Target Name="IncludePublishOutputInPack" AfterTargets="PublishForPack" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(SiteExtensionPublishDir)**\*"
+            Exclude="$(SiteExtensionPublishDir)**\*.pdb">
+        <Pack>true</Pack>
+        <PackagePath>content/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </None>
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+  </ItemGroup>
+
+</Project>

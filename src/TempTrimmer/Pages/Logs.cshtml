@@ -1,0 +1,93 @@
+@page
+@model LogsModel
+@{
+    ViewData["Title"] = "Logs";
+    var levels = new[] { "All", "Information", "Warning", "Error", "Fatal", "Debug" };
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0">Logs</h1>
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <select name="level" class="form-select form-select-sm" style="width:auto;"
+                onchange="this.form.submit()">
+            @foreach (var lv in levels)
+            {
+                <option value="@lv" selected="@(Model.SelectedLevel == lv)">@lv</option>
+            }
+        </select>
+        <select name="lines" class="form-select form-select-sm" style="width:auto;"
+                onchange="this.form.submit()">
+            @foreach (var n in new[] { 50, 100, 200, 500 })
+            {
+                <option value="@n" selected="@(Model.PageSize == n)">Last @n</option>
+            }
+        </select>
+        <a asp-page="/Logs" asp-route-level="@Model.SelectedLevel" asp-route-lines="@Model.PageSize"
+           class="btn btn-sm btn-outline-secondary">Refresh</a>
+    </form>
+</div>
+
+@if (!Model.Entries.Any())
+{
+    <div class="alert alert-secondary">No log entries found.</div>
+}
+else
+{
+    <div class="log-container">
+        @foreach (var entry in Model.Entries)
+        {
+            var levelClass = entry.Level.ToLowerInvariant() switch
+            {
+                "warning" => "table-warning",
+                "error" or "fatal" => "table-danger",
+                "debug" or "verbose" => "table-secondary",
+                _ => string.Empty,
+            };
+            var levelBadgeClass = entry.Level.ToLowerInvariant() switch
+            {
+                "warning" => "bg-warning text-dark",
+                "error" => "bg-danger",
+                "fatal" => "bg-danger",
+                "debug" => "bg-secondary",
+                "verbose" => "bg-light text-dark border",
+                _ => "bg-success",
+            };
+
+            <div class="log-entry card mb-1 @levelClass">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex gap-2 align-items-start">
+                        <span class="badge @levelBadgeClass text-nowrap mt-1" style="min-width:80px;">
+                            @entry.Level
+                        </span>
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="text-muted small me-3 text-nowrap float-end">
+                                @entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                            </div>
+                            <div class="log-message">@entry.RenderedMessage</div>
+                            @if (entry.Exception != null)
+                            {
+                                <pre class="text-danger small mt-1 mb-0 overflow-auto">@entry.Exception</pre>
+                            }
+                            @if (entry.Properties.Count > 0)
+                            {
+                                <details class="mt-1">
+                                    <summary class="text-muted small" style="cursor:pointer;">Properties</summary>
+                                    <div class="font-monospace small mt-1">
+                                        @foreach (var (key, value) in entry.Properties)
+                                        {
+                                            <div><span class="text-muted">@key</span> = @value</div>
+                                        }
+                                    </div>
+                                </details>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <p class="text-muted small mt-3">
+        Showing @Model.Entries.Count entry/entries.
+        Log files are stored in <code>%TEMP%\TempTrimmer\</code> and are subject to the normal deletion policy.
+    </p>
+}
