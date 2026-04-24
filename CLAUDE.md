@@ -44,14 +44,34 @@ Owner has a NuGet account authenticated via Microsoft 365 Entra (no code-signing
 - GitHub Actions CI YAML (build + test on every PR and push to main)
 - Dependabot enabled (`dependabot.yml`)
 
-### Open questions (to be resolved before implementation)
+### Resolved design decisions
 
-- **Temp folder target**: which folder(s) to monitor? `D:\local\Temp`? Configurable path?
-- **Trigger mechanism**: background hosted service (timer), HTTP on-demand endpoint, or both?
-- **UI**: admin page in Kudu SCM, API-only, or full dashboard?
-- **Configuration source**: Azure App Settings (env vars), JSON config file, or both?
-- **NuGet package ID / namespace**: e.g. `TempTrimmer`, `ACS.TempTrimmer`, etc.
-- **Default values**: max file age, max total size threshold
+| Decision | Resolution |
+|---|---|
+| Temp folder target | `%TEMP%` (per-sandbox on Azure App Service) |
+| Trigger | Background `IHostedService` (15 min default) + `POST /api/trim` HTTP endpoint |
+| UI | Dashboard (stats, last run, Run Now), Configuration form, Log viewer |
+| Configuration | `appsettings.json` + environment variable overrides; `IOptionsSnapshot` in pages, `IOptionsMonitor` in background service; `ConfigPersistenceService` writes back and calls `IConfigurationRoot.Reload()` |
+| NuGet package ID | `AcsSolutions.TempTrimmer` |
+| Default MaxAge | 72 hours (`TimeSpan`) |
+| Default MaxTotalSizeMb | 1024 (1 GB) |
+| Logging | Serilog JSONL (CLEF) rolling daily to `%TEMP%\TempTrimmer\log-.jsonl` |
+
+### API Key authentication
+
+`POST /api/trim` requires `X-Api-Key` header when `TempTrimmer:ApiKey` is set.
+If the key is empty, the endpoint is unauthenticated (a warning is logged).
+
+### Deploying a new version (NuGet)
+
+1. Tag the commit: `git tag v1.x.x && git push origin v1.x.x`
+2. CI runs, builds the NuGet package, and publishes it to NuGet.org using the `NUGET_API_KEY` repository secret.
+
+### Notes for future work
+
+- Add a `TempTrimmer:PathBase` app setting to `/AcsSolutions.TempTrimmer` for correct Kudu link generation.
+- Code-signing certificate: add `SignTool` step to CI once a certificate is obtained.
+- Consider adding ANTIFORGERY token validation to the `/api/trim` endpoint for CSRF protection if ever called from a browser context.
 
 ## Conventions
 
