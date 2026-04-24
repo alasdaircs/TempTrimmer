@@ -11,10 +11,15 @@ public sealed partial class LogReaderService
 
     public LogReaderService(IOptionsMonitor<TrimmerOptions> options) => _options = options;
 
-    public IReadOnlyList<LogEntry> ReadRecent(int maxEntries = 200, string? levelFilter = null)
+    public string GetLogDirectory()
     {
         var tempPath = Environment.ExpandEnvironmentVariables(_options.CurrentValue.TempPath);
-        var logDir = Path.Combine(tempPath, "TempTrimmer");
+        return Path.Combine(tempPath, "TempTrimmer");
+    }
+
+    public IReadOnlyList<LogEntry> ReadRecent(int maxEntries = 200, string? levelFilter = null)
+    {
+        var logDir = GetLogDirectory();
 
         if (!Directory.Exists(logDir)) return [];
 
@@ -36,11 +41,14 @@ public sealed partial class LogReaderService
     {
         try
         {
-            var lines = File.ReadAllLines(path);
+            string[] lines;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var reader = new StreamReader(fs, System.Text.Encoding.UTF8))
+                lines = reader.ReadToEnd().Split('\n');
             var result = new List<LogEntry>();
             for (var i = lines.Length - 1; i >= 0 && result.Count < limit; i--)
             {
-                var line = lines[i];
+                var line = lines[i].TrimEnd('\r');
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 try
                 {

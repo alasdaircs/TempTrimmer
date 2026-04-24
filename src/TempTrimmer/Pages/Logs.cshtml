@@ -29,7 +29,9 @@
 
 @if (!Model.Entries.Any())
 {
-    <div class="alert alert-secondary">No log entries found.</div>
+    <div class="alert alert-secondary">
+        No log entries found in <code>@Model.LogDirectory</code>.
+    </div>
 }
 else
 {
@@ -88,6 +90,6 @@ else
     </div>
     <p class="text-muted small mt-3">
         Showing @Model.Entries.Count entry/entries.
-        Log files are stored in <code>%TEMP%\TempTrimmer\</code> and are subject to the normal deletion policy.
+        Log files are stored in <code>@Model.LogDirectory</code> and are subject to the normal deletion policy.
     </p>
 }
