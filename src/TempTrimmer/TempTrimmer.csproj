@@ -25,23 +25,46 @@
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
-    <!-- Suppress default web build output from pack; we include publish output instead -->
+    <!-- Suppress DLL build output from pack; we include publish output instead -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <IncludeContentInPack>false</IncludeContentInPack>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- NU5100: DLLs in content/ rather than lib/ is expected for a site extension deploy package -->
+    <NoWarn>$(NoWarn);NU5100</NoWarn>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
-    <!-- Publish output directory used by the pack target below -->
-    <SiteExtensionPublishDir>$(MSBuildProjectDirectory)/publish/</SiteExtensionPublishDir>
+    <!-- Normalised absolute path; GetFullPath ensures consistent separators for MakeRelative -->
+    <SiteExtensionPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\publish\'))</SiteExtensionPublishDir>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Site Extension IIS transform -->
     <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
-    <!-- NuGet package root assets -->
-    <None Include="$(MSBuildThisFileDirectory)../../icon.png" Pack="true" PackagePath="" />
-    <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="" Condition="Exists('$(MSBuildThisFileDirectory)../../README.md')" />
+    <!-- Icon must be a static item reference — dynamic target-added items are not picked up by NuGet icon validation -->
+    <None Include="icon.png" Pack="true" PackagePath="icon.png" CopyToOutputDirectory="Never" />
   </ItemGroup>
+
+  <!-- Remove Content items from the collection so they don't reach _PackageFilesToExclude.
+       Setting Pack=false instead would add them to _PackageFilesToExclude, which suppresses
+       any None item with the same PackagePath — including our published copies. -->
+  <Target Name="SuppressContentForPack" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <Content Remove="@(Content)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Resolve absolute path to solution root for README inclusion -->
+  <PropertyGroup>
+    <_SolutionRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</_SolutionRoot>
+  </PropertyGroup>
+
+  <Target Name="AddRootAssetsToPackage" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(_SolutionRoot)\README.md" Condition="Exists('$(_SolutionRoot)\README.md')">
+        <Pack>true</Pack>
+        <PackagePath>README.md</PackagePath>
+      </None>
+    </ItemGroup>
+  </Target>
 
   <!-- Publish the web app into publish/ before collecting package files -->
   <Target Name="PublishForPack" BeforeTargets="_GetPackageFiles" Condition="'$(NoBuild)' != 'true'">
@@ -50,13 +73,21 @@
              Properties="Configuration=$(Configuration);PublishDir=$(SiteExtensionPublishDir);SelfContained=false" />
   </Target>
 
-  <!-- Include published output in content/ folder of the NuGet package -->
-  <Target Name="IncludePublishOutputInPack" AfterTargets="PublishForPack" BeforeTargets="_GetPackageFiles">
+  <!-- Include published output in content/ folder of the NuGet package.
+       Uses a scratch item type + MakeRelative to avoid %(RecursiveDir) base-directory ambiguity.
+       The Condition guard prevents double-execution if _GetPackageFiles is called more than once. -->
+  <Target Name="IncludePublishOutputInPack" AfterTargets="PublishForPack" BeforeTargets="_GetPackageFiles"
+          Condition="'$(_PublishItemsAdded)' != 'true'">
+    <PropertyGroup>
+      <_PublishItemsAdded>true</_PublishItemsAdded>
+    </PropertyGroup>
     <ItemGroup>
-      <None Include="$(SiteExtensionPublishDir)**\*"
-            Exclude="$(SiteExtensionPublishDir)**\*.pdb">
+      <_PublishOutput Include="$(SiteExtensionPublishDir)**\*" Exclude="$(SiteExtensionPublishDir)**\*.pdb" />
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="@(_PublishOutput)">
         <Pack>true</Pack>
-        <PackagePath>content/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+        <PackagePath>content/$([MSBuild]::MakeRelative('$(SiteExtensionPublishDir)', '%(FullPath)').Replace('\', '/'))</PackagePath>
       </None>
     </ItemGroup>
   </Target>
