@@ -12,7 +12,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>AcsSolutions.TempTrimmer</PackageId>
     <Title>TempTrimmer — Azure App Service Temp Folder Manager</Title>
-    <Version>1.0.0</Version>
+    <Version>1.0.0-preview.1</Version>
     <Authors>ACS Solutions</Authors>
     <Copyright>Copyright © ACS Solutions 2026</Copyright>
     <Description>Azure Windows App Service Site Extension that automatically deletes aged and over-quota files from the temp folder. Configurable age threshold (default 72 h) and size quota (default 1 GB) with a Kudu admin dashboard, structured Serilog logging, and a REST trigger endpoint.</Description>
