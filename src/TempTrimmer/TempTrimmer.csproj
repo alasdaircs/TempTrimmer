@@ -4,7 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <!-- No AspNetCoreHostingModel — we use HttpPlatformHandler, not ANCM. -->
+    <!-- Prevent the SDK from overwriting our hand-crafted web.config during publish. -->
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
     <RootNamespace>AcsSolutions.TempTrimmer</RootNamespace>
     <AssemblyName>TempTrimmer</AssemblyName>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
@@ -13,7 +15,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>AcsSolutions.TempTrimmer</PackageId>
     <Title>TempTrimmer — Azure App Service Temp Folder Manager</Title>
-    <Version>1.0.0-preview.6</Version>
+    <Version>1.0.0-preview.7</Version>
     <Authors>ACS Solutions</Authors>
     <Copyright>Copyright © ACS Solutions 2026</Copyright>
     <Description>Azure Windows App Service Site Extension that automatically deletes aged and over-quota files from the temp folder. Configurable age threshold (default 72 h) and size quota (default 1 GB) with a Kudu admin dashboard, structured Serilog logging, and a REST trigger endpoint.</Description>
@@ -41,7 +43,7 @@
     <!-- Site Extension IIS transform -->
     <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
     <!-- Icon must be a static item reference — dynamic target-added items are not picked up by NuGet icon validation -->
-    <None Include="icon.png" Pack="true" PackagePath="icon.png" CopyToOutputDirectory="Never" />
+    <Content Include="icon.png" Pack="true" PackagePath="icon.png" CopyToOutputDirectory="Never" />
     <!-- Kudu lifecycle scripts: preinstall runs (from the old version) before files are overwritten;
          postinstall runs (from the new version) after files are in place. -->
     <None Include="tools\preinstall.cmd" Pack="true" PackagePath="content/tools/" CopyToOutputDirectory="Never" />
@@ -73,16 +75,13 @@
 
   <!-- Publish the web app into publish/ before collecting package files -->
   <Target Name="PublishForPack" BeforeTargets="_GetPackageFiles" Condition="'$(NoBuild)' != 'true'">
-    <MSBuild Projects="$(MSBuildProjectFullPath)"
-             Targets="Publish"
-             Properties="Configuration=$(Configuration);PublishDir=$(SiteExtensionPublishDir);SelfContained=false" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Publish" Properties="Configuration=$(Configuration);PublishDir=$(SiteExtensionPublishDir);SelfContained=false" />
   </Target>
 
   <!-- Include published output in content/ folder of the NuGet package.
        Uses a scratch item type + MakeRelative to avoid %(RecursiveDir) base-directory ambiguity.
        The Condition guard prevents double-execution if _GetPackageFiles is called more than once. -->
-  <Target Name="IncludePublishOutputInPack" AfterTargets="PublishForPack" BeforeTargets="_GetPackageFiles"
-          Condition="'$(_PublishItemsAdded)' != 'true'">
+  <Target Name="IncludePublishOutputInPack" AfterTargets="PublishForPack" BeforeTargets="_GetPackageFiles" Condition="'$(_PublishItemsAdded)' != 'true'">
     <PropertyGroup>
       <_PublishItemsAdded>true</_PublishItemsAdded>
     </PropertyGroup>
