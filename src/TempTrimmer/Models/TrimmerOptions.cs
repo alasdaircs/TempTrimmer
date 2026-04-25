@@ -9,7 +9,7 @@ public sealed class TrimmerOptions
     public string TempPath { get; set; } = "%TEMP%";
     public string ApiKey { get; set; } = string.Empty;
     public TimeSpan ScanInterval { get; set; } = TimeSpan.FromMinutes(15);
-    public string[] ExcludedFolders { get; set; } = ["/jobs*"];
-    public string[] ExcludedFiles { get; set; } = ["/applicationhost.config"];
+    public string[] ExcludedFolders { get; set; } = [];
+    public string[] ExcludedFiles { get; set; } = [];
     public bool DryRun { get; set; } = true;
 }
