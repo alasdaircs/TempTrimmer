@@ -1,17 +1,33 @@
 <?xml version="1.0"?>
 <configuration xmlns:xdt="http://schemas.microsoft.com/XML-Document-Transform">
   <system.applicationHost>
+    <applicationPools>
+      <!--
+        Remove any stale pool so the transform is idempotent, then insert a fresh
+        one with managedRuntimeVersion="" (No Managed Code) — correct for a
+        .NET Core out-of-process app. A dedicated pool avoids the 500.35 / 500.34
+        ANCM errors that arise when sharing the SCM site's in-process pool.
+      -->
+      <add name="AcsSolutions.TempTrimmer"
+           managedRuntimeVersion=""
+           xdt:Locator="Match(name)"
+           xdt:Transform="Remove" />
+      <add name="AcsSolutions.TempTrimmer"
+           managedRuntimeVersion=""
+           xdt:Transform="Insert" />
+    </applicationPools>
     <sites>
       <site name="%XDT_SCMSITENAME%" xdt:Locator="Match(name)">
         <!--
           Remove any stale virtual application entry so the transform is idempotent,
-          then insert a fresh one pointing at the extension's physical directory.
+          then insert a fresh one pointing at the extension's physical directory,
+          using the dedicated pool above.
         -->
         <application path="/AcsSolutions.TempTrimmer"
                      xdt:Locator="Match(path)"
                      xdt:Transform="Remove" />
         <application path="/AcsSolutions.TempTrimmer"
-                     applicationPool="%XDT_APPPOOLNAME%"
+                     applicationPool="AcsSolutions.TempTrimmer"
                      xdt:Transform="Insert">
           <virtualDirectory path="/" physicalPath="%XDT_EXTENSIONPATH%" />
         </application>
