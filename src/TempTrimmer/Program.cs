@@ -61,6 +61,11 @@ try
     app.UseRouting();
     app.MapRazorPages();
 
+    // icon.png lives at the content root (not wwwroot) so the static files middleware
+    // can't serve it; expose it via a dedicated endpoint instead.
+    app.MapGet("/icon.png", (IWebHostEnvironment env) =>
+        Results.File(Path.Combine(env.ContentRootPath, "icon.png"), "image/png"));
+
     TrimEndpoints.Map(app);
 
     app.Run();

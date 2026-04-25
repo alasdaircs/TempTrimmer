@@ -42,8 +42,9 @@
   <ItemGroup>
     <!-- Site Extension IIS transform -->
     <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
-    <!-- Icon must be a static None item — SuppressContentForPack removes all Content items -->
-    <None Include="wwwroot\icon.png" Pack="true" PackagePath="icon.png" />
+    <!-- Icon must be a static None item — SuppressContentForPack removes all Content items.
+         Must live outside wwwroot/ or the Static Web Assets pipeline suppresses it at pack. -->
+    <None Include="icon.png" Pack="true" PackagePath="icon.png" />
     <!-- Kudu lifecycle scripts: preinstall runs (from the old version) before files are overwritten;
          postinstall runs (from the new version) after files are in place. -->
     <None Include="tools\preinstall.cmd" Pack="true" PackagePath="content/tools/" CopyToOutputDirectory="Never" />
