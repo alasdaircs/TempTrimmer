@@ -63,6 +63,58 @@
             </div>
 
             <div class="card mb-3">
+                <div class="card-header">Exclusions</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Glob patterns relative to the temp folder root. Use <code>*</code> to match any
+                        characters within a single path segment, <code>**</code> to match across segments.
+                        A leading <code>/</code> anchors the pattern to the root.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="Form.ExcludedFolders" class="form-label fw-semibold">
+                            Excluded Folders
+                        </label>
+                        <textarea asp-for="Form.ExcludedFolders" class="form-control font-monospace" rows="4"
+                                  placeholder="/jobs*"></textarea>
+                        <div class="form-text">
+                            One pattern per line. Matching folders and all their contents are ignored.
+                            Example: <code>/jobs*</code> skips any top-level folder whose name starts with <em>jobs</em>.
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="Form.ExcludedFiles" class="form-label fw-semibold">
+                            Excluded Files
+                        </label>
+                        <textarea asp-for="Form.ExcludedFiles" class="form-control font-monospace" rows="4"
+                                  placeholder="/applicationhost.config"></textarea>
+                        <div class="form-text">
+                            One pattern per line. Matching files are ignored regardless of age or size.
+                            Example: <code>/applicationhost.config</code> skips that file at the root.
+                            Use <code>**/applicationhost.config</code> to skip it anywhere in the tree.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Behaviour</div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-0">
+                        <input asp-for="Form.DryRun" class="form-check-input" type="checkbox"
+                               role="switch" id="dryRunSwitch" />
+                        <label class="form-check-label fw-semibold" for="dryRunSwitch">
+                            Dry-run mode
+                        </label>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        When enabled, no files are deleted. The <strong>Files</strong> tab on the
+                        dashboard shows exactly which files <em>would</em> be removed so you can
+                        review and adjust exclusions before your first real run.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mb-3">
                 <div class="card-header">Scheduler</div>
                 <div class="card-body">
                     <div class="mb-0">

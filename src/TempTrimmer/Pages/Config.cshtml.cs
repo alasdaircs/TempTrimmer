@@ -31,6 +31,9 @@ public class ConfigModel : PageModel
             MaxTotalSizeMb = opts.MaxTotalSizeMb,
             ScanIntervalMinutes = (int)opts.ScanInterval.TotalMinutes,
             ApiKey = opts.ApiKey,
+            ExcludedFolders = string.Join("\n", opts.ExcludedFolders),
+            ExcludedFiles = string.Join("\n", opts.ExcludedFiles),
+            DryRun = opts.DryRun,
         };
     }
 
@@ -46,12 +49,19 @@ public class ConfigModel : PageModel
             ScanInterval = TimeSpan.FromMinutes(Form.ScanIntervalMinutes),
             ApiKey = Form.ApiKey?.Trim() ?? string.Empty,
             TempPath = current.TempPath,
+            ExcludedFolders = ParseLines(Form.ExcludedFolders),
+            ExcludedFiles = ParseLines(Form.ExcludedFiles),
+            DryRun = Form.DryRun,
         };
 
         await _persistence.SaveOptionsAsync(updated);
         TempData["Message"] = "Configuration saved successfully.";
         return RedirectToPage();
     }
+
+    private static string[] ParseLines(string? value) =>
+        value?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+             ?? [];
 }
 
 public sealed class ConfigFormModel
@@ -61,4 +71,7 @@ public sealed class ConfigFormModel
     [Range(1, 102400)] public long MaxTotalSizeMb { get; set; } = 1024;
     [Range(1, 1440)] public int ScanIntervalMinutes { get; set; } = 15;
     public string? ApiKey { get; set; }
+    public string ExcludedFolders { get; set; } = "/jobs*";
+    public string ExcludedFiles { get; set; } = "/applicationhost.config";
+    public bool DryRun { get; set; } = true;
 }

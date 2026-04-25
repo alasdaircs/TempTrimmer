@@ -1,11 +1,19 @@
 @page
+@using Microsoft.AspNetCore.Html
 @model IndexModel
 @{
     ViewData["Title"] = "Dashboard";
+    var isDryRun = Model.IsDryRun;
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="h3 mb-0">Dashboard</h1>
+    <h1 class="h3 mb-0">
+        Dashboard
+        @if (isDryRun)
+        {
+            <span class="badge bg-warning text-dark ms-2 fs-6 align-middle">Dry-run</span>
+        }
+    </h1>
     <span class="text-muted small">Temp path: <code>@Model.Stats?.Path</code></span>
 </div>
 
@@ -57,44 +65,172 @@
             </div>
         </div>
     </div>
+    <div class="col-12 col-lg-6">
+        <div class="card h-100 border-info">
+            <div class="card-body">
+                <p class="card-subtitle text-muted small mb-1">
+                    Drive Free Space@(Model.FreeDriveName is not null ? $" ({Model.FreeDriveName})" : "")
+                </p>
+                @if (Model.FreeSpaceBytes >= 0)
+                {
+                    <p class="display-6 mb-0">@FormatBytes(Model.FreeSpaceBytes)</p>
+                }
+                else
+                {
+                    <p class="fs-5 mb-0 text-muted">Unavailable</p>
+                }
+                <p class="text-muted small mb-0">Shared across this App Service Plan — not just this app</p>
+            </div>
+        </div>
+    </div>
 </div>
 
-@if (Model.LastResult != null)
-{
-    var r = Model.LastResult;
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between">
-            <strong>Last Run</strong>
-            <span class="text-muted small">@r.CompletedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-sm-3">
-                    <div class="text-muted small">Files Deleted</div>
-                    <div class="fs-4 fw-semibold">@r.DeletedFiles.Count</div>
+<ul class="nav nav-tabs mb-0" id="dashTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="files-tab" data-bs-toggle="tab"
+                data-bs-target="#filesPane" type="button" role="tab">
+            @(isDryRun ? "Dry-run Preview" : "Deletion Log")
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lastrun-tab" data-bs-toggle="tab"
+                data-bs-target="#lastrunPane" type="button" role="tab">
+            Last Run
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 mb-4">
+
+    @* ---- Files tab ---- *@
+    <div class="tab-pane fade show active" id="filesPane" role="tabpanel">
+
+        @if (isDryRun)
+        {
+            <div class="alert alert-warning d-flex gap-2 mb-3 py-2" role="alert">
+                <span>&#9888;</span>
+                <span>
+                    <strong>Dry-run is enabled</strong> — no files will be deleted.
+                    Review the list below and adjust <a asp-page="/Config">exclusions</a> as needed,
+                    then disable dry-run mode when you are satisfied.
+                </span>
+            </div>
+
+            @if (Model.DryRunPreview is { Count: > 0 } preview)
+            {
+                <p class="text-muted small mb-2">
+                    @preview.Count file(s) would be deleted
+                    (@FormatBytes(preview.Sum(f => f.SizeBytes)) total) based on current settings.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped font-monospace small mb-0">
+                        <thead>
+                            <tr>
+                                <th>Path</th>
+                                <th class="text-end">Size</th>
+                                <th>Last Write (UTC)</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var f in preview.OrderBy(f => f.Path))
+                            {
+                                <tr>
+                                    <td class="text-break">@f.Path</td>
+                                    <td class="text-end text-nowrap">@FormatBytes(f.SizeBytes)</td>
+                                    <td class="text-nowrap">@f.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@ReasonBadge(f.Reason)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-                <div class="col-sm-3">
-                    <div class="text-muted small">Space Freed</div>
-                    <div class="fs-4 fw-semibold">@FormatBytes(r.TotalBytesFreed)</div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No files would be deleted with the current settings.</p>
+            }
+        }
+        else
+        {
+            @if (Model.DeletionLog is { Count: > 0 } log)
+            {
+                <p class="text-muted small mb-2">
+                    Showing last @log.Count deletion(s) (most recent first, capped at 500).
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped font-monospace small mb-0">
+                        <thead>
+                            <tr>
+                                <th>Deleted At (UTC)</th>
+                                <th>Path</th>
+                                <th class="text-end">Size</th>
+                                <th>Last Write (UTC)</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in log.Reverse())
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@e.DeletedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td class="text-break">@e.Path</td>
+                                    <td class="text-end text-nowrap">@FormatBytes(e.SizeBytes)</td>
+                                    <td class="text-nowrap">@e.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@ReasonBadge(e.Reason)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-                <div class="col-sm-3">
-                    <div class="text-muted small">Duration</div>
-                    <div class="fs-4 fw-semibold">@r.Duration.TotalMilliseconds.ToString("F0") ms</div>
-                </div>
-                @if (r.Errors.Count > 0)
-                {
+            }
+            else
+            {
+                <p class="text-muted mb-0">No files have been deleted yet.</p>
+            }
+        }
+    </div>
+
+    @* ---- Last Run tab ---- *@
+    <div class="tab-pane fade" id="lastrunPane" role="tabpanel">
+        @if (Model.LastResult is { } r)
+        {
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="row g-3 flex-grow-1">
                     <div class="col-sm-3">
-                        <div class="text-muted small">Errors</div>
-                        <div class="fs-4 fw-semibold text-danger">@r.Errors.Count</div>
+                        <div class="text-muted small">@(r.IsDryRun ? "Would Delete" : "Files Deleted")</div>
+                        <div class="fs-4 fw-semibold">@r.DeletedFiles.Count</div>
                     </div>
-                }
+                    <div class="col-sm-3">
+                        <div class="text-muted small">@(r.IsDryRun ? "Would Free" : "Space Freed")</div>
+                        <div class="fs-4 fw-semibold">@FormatBytes(r.TotalBytesFreed)</div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="text-muted small">Duration</div>
+                        <div class="fs-4 fw-semibold">@r.Duration.TotalMilliseconds.ToString("F0") ms</div>
+                    </div>
+                    @if (r.Errors.Count > 0)
+                    {
+                        <div class="col-sm-3">
+                            <div class="text-muted small">Errors</div>
+                            <div class="fs-4 fw-semibold text-danger">@r.Errors.Count</div>
+                        </div>
+                    }
+                </div>
+                <div class="text-end ms-3 flex-shrink-0">
+                    @if (r.IsDryRun)
+                    {
+                        <span class="badge bg-warning text-dark d-block mb-1">Dry-run</span>
+                    }
+                    <span class="text-muted small">@r.CompletedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+                </div>
             </div>
 
             @if (r.DeletedFiles.Count > 0)
             {
-                <details class="mt-3">
+                <details>
                     <summary class="text-muted small" style="cursor:pointer;">
-                        Show deleted files (@r.DeletedFiles.Count)
+                        @(r.IsDryRun ? $"Show candidates ({r.DeletedFiles.Count})" : $"Show deleted files ({r.DeletedFiles.Count})")
                     </summary>
                     <div class="table-responsive mt-2">
                         <table class="table table-sm table-striped font-monospace small">
@@ -113,16 +249,7 @@
                                         <td class="text-break">@f.Path</td>
                                         <td class="text-end text-nowrap">@FormatBytes(f.SizeBytes)</td>
                                         <td class="text-nowrap">@f.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                        <td>
-                                            @if (f.Reason == DeletionReason.TooOld)
-                                            {
-                                                <span class="badge bg-warning text-dark">Too Old</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-danger">Over Quota</span>
-                                            }
-                                        </td>
+                                        <td>@ReasonBadge(f.Reason)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -143,13 +270,17 @@
                     </ul>
                 </details>
             }
-        </div>
+        }
+        else
+        {
+            <p class="text-muted mb-0">No run has completed yet.</p>
+        }
     </div>
-}
+</div>
 
 <form method="post" asp-page-handler="RunNow" class="d-inline">
     <button type="submit" class="btn btn-primary" @(Model.IsRunning ? "disabled" : string.Empty)>
-        Run Now
+        @(isDryRun ? "Preview Now" : "Run Now")
     </button>
 </form>
 <a asp-page="/Index" class="btn btn-outline-secondary ms-2">Refresh</a>
@@ -160,4 +291,9 @@
         : bytes >= 1_048_576 ? $"{bytes / 1_048_576.0:F1} MB"
         : bytes >= 1_024 ? $"{bytes / 1_024.0:F1} KB"
         : $"{bytes} B";
+
+    static HtmlString ReasonBadge(DeletionReason reason) =>
+        reason == DeletionReason.TooOld
+            ? new HtmlString("<span class=\"badge bg-warning text-dark\">Too Old</span>")
+            : new HtmlString("<span class=\"badge bg-danger\">Over Quota</span>");
 }
