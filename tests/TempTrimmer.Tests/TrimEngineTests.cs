@@ -29,13 +29,21 @@ public sealed class TrimEngineTests : IDisposable
         return path;
     }
 
-    private TrimmerOptions DefaultOptions(TimeSpan? maxAge = null, long maxTotalSizeMb = 1024) =>
+    private TrimmerOptions DefaultOptions(
+        TimeSpan? maxAge = null,
+        long maxTotalSizeMb = 1024,
+        string[]? excludedFolders = null,
+        string[]? excludedFiles = null,
+        bool dryRun = false) =>
         new()
         {
             TempPath = _tempDir,
             MaxAge = maxAge ?? TimeSpan.FromHours(72),
             MaxTotalSizeMb = maxTotalSizeMb,
             ScanInterval = TimeSpan.FromMinutes(15),
+            DryRun = dryRun,
+            ExcludedFolders = excludedFolders ?? [],
+            ExcludedFiles = excludedFiles ?? [],
         };
 
     // --- age-based deletion ---
@@ -141,6 +149,63 @@ public sealed class TrimEngineTests : IDisposable
 
         Assert.DoesNotContain(result.DeletedFiles, f => f.Path == path);
         Assert.NotEmpty(result.Errors);
+    }
+
+    // --- exclusions ---
+
+    [Fact]
+    public void ExcludedFolder_FilesNotDeleted()
+    {
+        var jobsDir = Path.Combine(_tempDir, "jobs_abc");
+        Directory.CreateDirectory(jobsDir);
+        var inside = Path.Combine(jobsDir, "old.tmp");
+        File.WriteAllBytes(inside, new byte[100]);
+        File.SetLastWriteTimeUtc(inside, DateTime.UtcNow.AddDays(-10));
+
+        var result = _engine.Execute(DefaultOptions(excludedFolders: ["/jobs*"]));
+
+        Assert.DoesNotContain(result.DeletedFiles, f => f.Path == inside);
+        Assert.True(File.Exists(inside));
+    }
+
+    [Fact]
+    public void ExcludedFile_NotDeleted()
+    {
+        var path = CreateFile("applicationhost.config", 100, DateTime.UtcNow.AddDays(-10));
+
+        var result = _engine.Execute(DefaultOptions(excludedFiles: ["/applicationhost.config"]));
+
+        Assert.DoesNotContain(result.DeletedFiles, f => f.Path == path);
+        Assert.True(File.Exists(path));
+    }
+
+    // --- dry-run ---
+
+    [Fact]
+    public void DryRun_FilesNotDeleted_CandidatesReturned()
+    {
+        var path = CreateFile("old.tmp", 100, DateTime.UtcNow.AddDays(-10));
+
+        var result = _engine.Execute(DefaultOptions(dryRun: true));
+
+        Assert.True(result.IsDryRun);
+        Assert.Contains(result.DeletedFiles, f => f.Path == path);
+        Assert.True(File.Exists(path));
+    }
+
+    // --- GetCandidates ---
+
+    [Fact]
+    public void GetCandidates_ReturnsExpectedFiles()
+    {
+        var old = CreateFile("old.tmp", 100, DateTime.UtcNow.AddDays(-10));
+        var fresh = CreateFile("fresh.tmp", 100, DateTime.UtcNow.AddHours(-1));
+
+        var candidates = _engine.GetCandidates(DefaultOptions());
+
+        Assert.Contains(candidates, f => f.Path == old);
+        Assert.DoesNotContain(candidates, f => f.Path == fresh);
+        Assert.True(File.Exists(old));
     }
 
     // --- GetStats ---
