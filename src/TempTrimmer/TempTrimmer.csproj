@@ -43,7 +43,7 @@
     <!-- Site Extension IIS transform -->
     <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
     <!-- Icon must be a static None item — SuppressContentForPack removes all Content items -->
-    <None Include="icon.png" Pack="true" PackagePath="icon.png" />
+    <None Include="wwwroot\icon.png" Pack="true" PackagePath="icon.png" />
     <!-- Kudu lifecycle scripts: preinstall runs (from the old version) before files are overwritten;
          postinstall runs (from the new version) after files are in place. -->
     <None Include="tools\preinstall.cmd" Pack="true" PackagePath="content/tools/" CopyToOutputDirectory="Never" />
