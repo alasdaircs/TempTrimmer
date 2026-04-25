@@ -42,8 +42,8 @@
   <ItemGroup>
     <!-- Site Extension IIS transform -->
     <None Include="applicationHost.xdt" Pack="true" PackagePath="content/" CopyToOutputDirectory="Never" />
-    <!-- Icon must be a static item reference — dynamic target-added items are not picked up by NuGet icon validation -->
-    <Content Include="icon.png" Pack="true" PackagePath="icon.png" CopyToOutputDirectory="Never" />
+    <!-- Icon must be a static None item — SuppressContentForPack removes all Content items -->
+    <None Include="icon.png" Pack="true" PackagePath="icon.png" />
     <!-- Kudu lifecycle scripts: preinstall runs (from the old version) before files are overwritten;
          postinstall runs (from the new version) after files are in place. -->
     <None Include="tools\preinstall.cmd" Pack="true" PackagePath="content/tools/" CopyToOutputDirectory="Never" />
