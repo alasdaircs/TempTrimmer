@@ -36,6 +36,9 @@ public sealed class ConfigPersistenceService
                 options.TempPath,
                 options.ApiKey,
                 ScanInterval = options.ScanInterval.ToString(),
+                options.ExcludedFolders,
+                options.ExcludedFiles,
+                options.DryRun,
             });
 
             var updated = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });

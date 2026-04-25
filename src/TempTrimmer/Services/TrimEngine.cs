@@ -1,4 +1,5 @@
 using AcsSolutions.TempTrimmer.Models;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace AcsSolutions.TempTrimmer.Services;
 
@@ -16,12 +17,95 @@ public sealed class TrimEngine
         var cutoffUtc = startedAt - options.MaxAge;
 
         _logger.LogInformation(
-            "Trim run started. Path={Path} MaxAge={MaxAge} MaxTotalSizeMb={MaxTotalSizeMb}",
-            expandedPath, options.MaxAge, options.MaxTotalSizeMb);
+            "Trim run started (DryRun={DryRun}). Path={Path} MaxAge={MaxAge} MaxTotalSizeMb={MaxTotalSizeMb}",
+            options.DryRun, expandedPath, options.MaxAge, options.MaxTotalSizeMb);
 
-        var allFiles = EnumerateFiles(expandedPath);
+        var folderMatcher = BuildMatcher(options.ExcludedFolders);
+        var fileMatcher = BuildMatcher(options.ExcludedFiles);
+        var allFiles = EnumerateFiles(expandedPath, folderMatcher, fileMatcher);
 
-        // Condition 1 — age: mark files whose last-write time predates the cutoff.
+        var condemned = BuildCondemnedSet(allFiles, cutoffUtc, maxBytes);
+
+        var deleted = new List<DeletedFileInfo>();
+        var errors = new List<string>();
+
+        if (options.DryRun)
+        {
+            deleted.AddRange(condemned.Values.Select(c => ToInfo(c.File, c.Reason)));
+            _logger.LogInformation("Dry-run complete. {Count} file(s) would be deleted.", deleted.Count);
+        }
+        else
+        {
+            foreach (var (path, (file, reason)) in condemned)
+            {
+                try
+                {
+                    File.Delete(path);
+                    deleted.Add(ToInfo(file, reason));
+                    _logger.LogDebug("Deleted {Path} reason={Reason} size={SizeBytes}", path, reason, file.Length);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{path}: {ex.Message}");
+                    _logger.LogWarning("Could not delete {Path}: {Error}", path, ex.Message);
+                }
+            }
+
+            DeleteEmptyDirectories(expandedPath);
+        }
+
+        var result = new TrimResult
+        {
+            StartedAt = startedAt,
+            CompletedAt = DateTimeOffset.UtcNow,
+            DeletedFiles = deleted,
+            Errors = errors,
+            IsDryRun = options.DryRun,
+        };
+
+        _logger.LogInformation(
+            "Trim run complete (DryRun={IsDryRun}). Files={Count} BytesFreed={BytesFreed} Errors={ErrorCount} Duration={DurationMs}ms",
+            result.IsDryRun, deleted.Count, result.TotalBytesFreed, errors.Count,
+            (long)result.Duration.TotalMilliseconds);
+
+        return result;
+    }
+
+    public IReadOnlyList<DeletedFileInfo> GetCandidates(TrimmerOptions options)
+    {
+        var expandedPath = Environment.ExpandEnvironmentVariables(options.TempPath);
+        var maxBytes = options.MaxTotalSizeMb * 1024L * 1024L;
+        var cutoffUtc = DateTimeOffset.UtcNow - options.MaxAge;
+
+        var folderMatcher = BuildMatcher(options.ExcludedFolders);
+        var fileMatcher = BuildMatcher(options.ExcludedFiles);
+        var allFiles = EnumerateFiles(expandedPath, folderMatcher, fileMatcher);
+
+        return BuildCondemnedSet(allFiles, cutoffUtc, maxBytes).Values
+            .Select(c => ToInfo(c.File, c.Reason))
+            .ToList();
+    }
+
+    public TempFolderStats GetStats(string tempPath)
+    {
+        var expanded = Environment.ExpandEnvironmentVariables(tempPath);
+        var files = EnumerateFiles(expanded, null, null);
+        if (files.Count == 0)
+            return new TempFolderStats(expanded, 0, 0, null, null);
+
+        return new TempFolderStats(
+            expanded,
+            files.Sum(f => f.Length),
+            files.Count,
+            new DateTimeOffset(files.Min(f => f.LastWriteTimeUtc), TimeSpan.Zero),
+            new DateTimeOffset(files.Max(f => f.LastWriteTimeUtc), TimeSpan.Zero));
+    }
+
+    private static Dictionary<string, (FileInfo File, DeletionReason Reason)> BuildCondemnedSet(
+        IReadOnlyList<FileInfo> allFiles,
+        DateTimeOffset cutoffUtc,
+        long maxBytes)
+    {
         var condemned = new Dictionary<string, (FileInfo File, DeletionReason Reason)>(
             StringComparer.OrdinalIgnoreCase);
 
@@ -31,8 +115,6 @@ public sealed class TrimEngine
                 condemned[f.FullName] = (f, DeletionReason.TooOld);
         }
 
-        // Condition 2 — quota: if the total size of ALL files exceeds the threshold,
-        // mark the oldest surviving files until the projected total would be within quota.
         var totalBytes = allFiles.Sum(f => f.Length);
         if (totalBytes > maxBytes)
         {
@@ -45,64 +127,26 @@ public sealed class TrimEngine
             }
         }
 
-        var deleted = new List<DeletedFileInfo>();
-        var errors = new List<string>();
-
-        foreach (var (path, (file, reason)) in condemned)
-        {
-            try
-            {
-                File.Delete(path);
-                deleted.Add(new DeletedFileInfo(
-                    path,
-                    file.Length,
-                    new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero),
-                    reason));
-
-                _logger.LogDebug("Deleted {Path} reason={Reason} size={SizeBytes}",
-                    path, reason, file.Length);
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"{path}: {ex.Message}");
-                _logger.LogWarning("Could not delete {Path}: {Error}", path, ex.Message);
-            }
-        }
-
-        DeleteEmptyDirectories(expandedPath);
-
-        var result = new TrimResult
-        {
-            StartedAt = startedAt,
-            CompletedAt = DateTimeOffset.UtcNow,
-            DeletedFiles = deleted,
-            Errors = errors,
-        };
-
-        _logger.LogInformation(
-            "Trim run complete. Deleted={Count} BytesFreed={BytesFreed} Errors={ErrorCount} Duration={DurationMs}ms",
-            deleted.Count, result.TotalBytesFreed, errors.Count,
-            (long)result.Duration.TotalMilliseconds);
-
-        return result;
+        return condemned;
     }
 
-    public TempFolderStats GetStats(string tempPath)
+    private static DeletedFileInfo ToInfo(FileInfo file, DeletionReason reason) =>
+        new(file.FullName, file.Length, new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero), reason);
+
+    private static Matcher BuildMatcher(string[]? patterns)
     {
-        var expanded = Environment.ExpandEnvironmentVariables(tempPath);
-        var files = EnumerateFiles(expanded);
-        if (files.Count == 0)
-            return new TempFolderStats(expanded, 0, 0, null, null);
-
-        return new TempFolderStats(
-            expanded,
-            files.Sum(f => f.Length),
-            files.Count,
-            new DateTimeOffset(files.Min(f => f.LastWriteTimeUtc), TimeSpan.Zero),
-            new DateTimeOffset(files.Max(f => f.LastWriteTimeUtc), TimeSpan.Zero));
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        if (patterns is null) return matcher;
+        foreach (var p in patterns)
+        {
+            var trimmed = p.TrimStart('/');
+            if (!string.IsNullOrWhiteSpace(trimmed))
+                matcher.AddInclude(trimmed);
+        }
+        return matcher;
     }
 
-    private static IReadOnlyList<FileInfo> EnumerateFiles(string root)
+    private static IReadOnlyList<FileInfo> EnumerateFiles(string root, Matcher? folderMatcher, Matcher? fileMatcher)
     {
         var result = new List<FileInfo>();
         if (!Directory.Exists(root)) return result;
@@ -116,9 +160,24 @@ public sealed class TrimEngine
             try
             {
                 foreach (var file in Directory.GetFiles(dir))
+                {
+                    if (fileMatcher is not null)
+                    {
+                        var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+                        if (fileMatcher.Match(rel).HasMatches) continue;
+                    }
                     result.Add(new FileInfo(file));
+                }
+
                 foreach (var sub in Directory.GetDirectories(dir))
+                {
+                    if (folderMatcher is not null)
+                    {
+                        var rel = Path.GetRelativePath(root, sub).Replace('\\', '/');
+                        if (folderMatcher.Match(rel).HasMatches) continue;
+                    }
                     queue.Enqueue(sub);
+                }
             }
             catch (UnauthorizedAccessException) { }
             catch (DirectoryNotFoundException) { }

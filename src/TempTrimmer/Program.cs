@@ -41,6 +41,7 @@ try
         (IConfigurationRoot)sp.GetRequiredService<IConfiguration>());
 
     builder.Services.AddSingleton<TrimState>();
+    builder.Services.AddSingleton<DeletionLogService>();
     builder.Services.AddTransient<TrimEngine>();
     builder.Services.AddSingleton<ConfigPersistenceService>();
     builder.Services.AddTransient<LogReaderService>();

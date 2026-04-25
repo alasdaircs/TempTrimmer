@@ -11,6 +11,7 @@ public static class TrimEndpoints
         app.MapPost("/api/trim", async (
             TrimEngine engine,
             TrimState state,
+            DeletionLogService deletionLog,
             IOptionsMonitor<TrimmerOptions> options,
             ILogger<Program> logger) =>
         {
@@ -21,6 +22,10 @@ public static class TrimEndpoints
             try
             {
                 result = engine.Execute(options.CurrentValue);
+
+                if (!result.IsDryRun && result.DeletedFiles.Count > 0)
+                    await deletionLog.AppendAsync(result.DeletedFiles, result.CompletedAt);
+
                 return Results.Ok(result);
             }
             catch (Exception ex)

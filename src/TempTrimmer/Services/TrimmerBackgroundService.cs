@@ -7,17 +7,20 @@ public sealed class TrimmerBackgroundService : BackgroundService
 {
     private readonly TrimEngine _engine;
     private readonly TrimState _state;
+    private readonly DeletionLogService _deletionLog;
     private readonly IOptionsMonitor<TrimmerOptions> _options;
     private readonly ILogger<TrimmerBackgroundService> _logger;
 
     public TrimmerBackgroundService(
         TrimEngine engine,
         TrimState state,
+        DeletionLogService deletionLog,
         IOptionsMonitor<TrimmerOptions> options,
         ILogger<TrimmerBackgroundService> logger)
     {
         _engine = engine;
         _state = state;
+        _deletionLog = deletionLog;
         _options = options;
         _logger = logger;
     }
@@ -35,6 +38,9 @@ public sealed class TrimmerBackgroundService : BackgroundService
                 try
                 {
                     result = _engine.Execute(_options.CurrentValue);
+
+                    if (!result.IsDryRun && result.DeletedFiles.Count > 0)
+                        await _deletionLog.AppendAsync(result.DeletedFiles, result.CompletedAt);
                 }
                 catch (Exception ex)
                 {
