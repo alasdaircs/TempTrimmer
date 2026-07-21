@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# TempTrimmer UI-saved settings (local dev fallback when HOME is not set)
+src/TempTrimmer/TempTrimmer/

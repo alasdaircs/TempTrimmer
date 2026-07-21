@@ -1,4 +1,5 @@
 @page
+@using Microsoft.AspNetCore.Html
 @model ConfigModel
 @{
     ViewData["Title"] = "Configuration";
@@ -6,7 +7,14 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-7">
-        <h1 class="h3 mb-4">Configuration</h1>
+        <h1 class="h3 mb-3">Configuration</h1>
+
+        <p class="text-muted small mb-4">
+            Values shown are the <strong>effective</strong> configuration. Changes saved here are
+            written to <code>%HOME%\data\TempTrimmer\settings.json</code> and survive extension
+            upgrades — but Azure App Settings (<code>TempTrimmer__*</code>) always take precedence
+            and make the matching field read-only below.
+        </p>
 
         @if (TempData["Message"] is string msg)
         {
@@ -29,14 +37,17 @@
                         </p>
                         <div class="input-group" style="max-width:320px;">
                             <input asp-for="Form.MaxAgeDays" type="number" min="0" max="365"
-                                   class="form-control" placeholder="Days" />
+                                   class="form-control" placeholder="Days"
+                                   readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.MaxAge))" />
                             <span class="input-group-text">days</span>
                             <input asp-for="Form.MaxAgeHours" type="number" min="0" max="23"
-                                   class="form-control" placeholder="Hours" />
+                                   class="form-control" placeholder="Hours"
+                                   readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.MaxAge))" />
                             <span class="input-group-text">hours</span>
                         </div>
                         <span asp-validation-for="Form.MaxAgeDays" class="text-danger small"></span>
                         <span asp-validation-for="Form.MaxAgeHours" class="text-danger small"></span>
+                        @EnvNote(nameof(TrimmerOptions.MaxAge))
                     </div>
 
                     <div class="mb-3">
@@ -49,10 +60,17 @@
                         </p>
                         <div class="input-group" style="max-width:240px;">
                             <input asp-for="Form.MaxTotalSizeMb" type="number" min="1" max="102400"
-                                   class="form-control" />
+                                   class="form-control"
+                                   readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.MaxTotalSizeMb))" />
                             <span class="input-group-text">MB</span>
                         </div>
                         <span asp-validation-for="Form.MaxTotalSizeMb" class="text-danger small"></span>
+                        @EnvNote(nameof(TrimmerOptions.MaxTotalSizeMb))
+                        <p class="text-muted small mt-1 mb-0">
+                            All apps and slots on an instance share one temp quota. On a multi-app
+                            plan, aim for <em>instance temp quota ÷ number of apps and slots</em>,
+                            with headroom.
+                        </p>
                         <p class="text-muted small mt-1">
                             @(Model.Form.MaxTotalSizeMb > 0
                                 ? $"≈ {Model.Form.MaxTotalSizeMb / 1024.0:F2} GB"
@@ -75,23 +93,27 @@
                             Excluded Folders
                         </label>
                         <textarea asp-for="Form.ExcludedFolders" class="form-control font-monospace" rows="4"
-                                  placeholder="/jobs*"></textarea>
+                                  placeholder="/jobs*"
+                                  readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.ExcludedFolders))"></textarea>
                         <div class="form-text">
                             One pattern per line. Matching folders and all their contents are ignored.
                             Example: <code>/jobs*</code> skips any top-level folder whose name starts with <em>jobs</em>.
                         </div>
+                        @EnvNote(nameof(TrimmerOptions.ExcludedFolders))
                     </div>
                     <div class="mb-0">
                         <label asp-for="Form.ExcludedFiles" class="form-label fw-semibold">
                             Excluded Files
                         </label>
                         <textarea asp-for="Form.ExcludedFiles" class="form-control font-monospace" rows="4"
-                                  placeholder="/applicationhost.config"></textarea>
+                                  placeholder="/applicationhost.config"
+                                  readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.ExcludedFiles))"></textarea>
                         <div class="form-text">
                             One pattern per line. Matching files are ignored regardless of age or size.
                             Example: <code>/applicationhost.config</code> skips that file at the root.
                             Use <code>**/applicationhost.config</code> to skip it anywhere in the tree.
                         </div>
+                        @EnvNote(nameof(TrimmerOptions.ExcludedFiles))
                     </div>
                 </div>
             </div>
@@ -101,16 +123,18 @@
                 <div class="card-body">
                     <div class="form-check form-switch mb-0">
                         <input asp-for="Form.DryRun" class="form-check-input" type="checkbox"
-                               role="switch" id="dryRunSwitch" />
+                               role="switch" id="dryRunSwitch"
+                               disabled="@Model.IsEnvOverridden(nameof(TrimmerOptions.DryRun))" />
                         <label class="form-check-label fw-semibold" for="dryRunSwitch">
                             Dry-run mode
                         </label>
                     </div>
                     <p class="text-muted small mt-2 mb-0">
-                        When enabled, no files are deleted. The <strong>Files</strong> tab on the
-                        dashboard shows exactly which files <em>would</em> be removed so you can
-                        review and adjust exclusions before your first real run.
+                        When enabled, <strong>no files are ever deleted</strong> — TempTrimmer only
+                        reports what it would remove. The dashboard shows the candidates so you can
+                        review and adjust exclusions, then turn this off to arm the trimmer.
                     </p>
+                    @EnvNote(nameof(TrimmerOptions.DryRun))
                 </div>
             </div>
 
@@ -126,10 +150,12 @@
                         </p>
                         <div class="input-group" style="max-width:200px;">
                             <input asp-for="Form.ScanIntervalMinutes" type="number" min="1" max="1440"
-                                   class="form-control" />
+                                   class="form-control"
+                                   readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.ScanInterval))" />
                             <span class="input-group-text">min</span>
                         </div>
                         <span asp-validation-for="Form.ScanIntervalMinutes" class="text-danger small"></span>
+                        @EnvNote(nameof(TrimmerOptions.ScanInterval))
                     </div>
                 </div>
             </div>
@@ -146,12 +172,14 @@
                         </p>
                         <div class="input-group" style="max-width:480px;">
                             <input asp-for="Form.ApiKey" type="password" id="apiKeyInput"
-                                   class="form-control font-monospace" autocomplete="new-password" />
+                                   class="form-control font-monospace" autocomplete="new-password"
+                                   readonly="@Model.IsEnvOverridden(nameof(TrimmerOptions.ApiKey))" />
                             <button type="button" class="btn btn-outline-secondary"
                                     onclick="toggleApiKeyVisibility()">Show</button>
                             <button type="button" class="btn btn-outline-secondary"
                                     onclick="generateApiKey()">Regenerate</button>
                         </div>
+                        @EnvNote(nameof(TrimmerOptions.ApiKey))
                     </div>
                 </div>
             </div>
@@ -161,6 +189,15 @@
         </form>
     </div>
 </div>
+
+@functions {
+    IHtmlContent EnvNote(string optionName) =>
+        Model.IsEnvOverridden(optionName)
+            ? new HtmlString(
+                $"<div class=\"form-text text-warning\">Set by App Setting " +
+                $"<code>TempTrimmer__{optionName}</code> — read-only here; the App Setting always wins.</div>")
+            : HtmlString.Empty;
+}
 
 @section Scripts {
     <script>

@@ -16,8 +16,20 @@ public sealed class ConfigPersistenceService
         ILogger<ConfigPersistenceService> logger)
     {
         _configRoot = configRoot;
-        _settingsPath = Path.Combine(env.ContentRootPath, "appsettings.json");
+        _settingsPath = GetSettingsFilePath(env.ContentRootPath);
         _logger = logger;
+    }
+
+    /// <summary>
+    /// UI-saved settings must live outside the extension folder, which is wiped on every
+    /// upgrade or ARM re-install. On App Service %HOME% is the durable shared content root;
+    /// locally (no HOME) fall back to the content root.
+    /// </summary>
+    public static string GetSettingsFilePath(string contentRootPath)
+    {
+        var home = Environment.GetEnvironmentVariable("HOME");
+        var baseDir = string.IsNullOrWhiteSpace(home) ? contentRootPath : Path.Combine(home, "data");
+        return Path.Combine(baseDir, "TempTrimmer", "settings.json");
     }
 
     public async Task SaveOptionsAsync(TrimmerOptions options, CancellationToken ct = default)
@@ -25,27 +37,28 @@ public sealed class ConfigPersistenceService
         await _writeLock.WaitAsync(ct);
         try
         {
-            var json = await File.ReadAllTextAsync(_settingsPath, ct);
-            var root = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)
-                       ?? throw new InvalidOperationException("Could not parse appsettings.json.");
+            Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
 
-            root[TrimmerOptions.Section] = JsonSerializer.SerializeToElement(new
+            var root = new Dictionary<string, object>
             {
-                MaxAge = options.MaxAge.ToString(),
-                options.MaxTotalSizeMb,
-                options.TempPath,
-                options.ApiKey,
-                ScanInterval = options.ScanInterval.ToString(),
-                options.ExcludedFolders,
-                options.ExcludedFiles,
-                options.DryRun,
-            });
+                [TrimmerOptions.Section] = new
+                {
+                    MaxAge = options.MaxAge.ToString(),
+                    options.MaxTotalSizeMb,
+                    options.TempPath,
+                    options.ApiKey,
+                    ScanInterval = options.ScanInterval.ToString(),
+                    options.ExcludedFolders,
+                    options.ExcludedFiles,
+                    options.DryRun,
+                },
+            };
 
-            var updated = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(_settingsPath, updated, ct);
+            var json = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(_settingsPath, json, ct);
 
             _configRoot.Reload();
-            _logger.LogInformation("Configuration saved and reloaded.");
+            _logger.LogInformation("Configuration saved to {Path} and reloaded.", _settingsPath);
         }
         finally
         {

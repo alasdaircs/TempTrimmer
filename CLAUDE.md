@@ -51,11 +51,13 @@ Owner has a NuGet account authenticated via Microsoft 365 Entra (no code-signing
 | Temp folder target | `%TEMP%` (per-sandbox on Azure App Service) |
 | Trigger | Background `IHostedService` (15 min default) + `POST /api/trim` HTTP endpoint |
 | UI | Dashboard (stats, last run, Run Now), Configuration form, Log viewer |
-| Configuration | `appsettings.json` + environment variable overrides; `IOptionsSnapshot` in pages, `IOptionsMonitor` in background service; `ConfigPersistenceService` writes back and calls `IConfigurationRoot.Reload()` |
+| Configuration | Layered: shipped `appsettings.json` → UI-saved `%HOME%\data\TempTrimmer\settings.json` (durable; survives upgrades/re-installs) → environment variables. `IOptionsSnapshot` in pages, `IOptionsMonitor` in background service; `ConfigPersistenceService` writes the durable file and calls `IConfigurationRoot.Reload()`. Config UI shows effective values and marks env-overridden fields read-only |
 | NuGet package ID | `AcsSolutions.TempTrimmer` |
 | Default MaxAge | 72 hours (`TimeSpan`) |
-| Default MaxTotalSizeMb | 1024 (1 GB) |
-| Logging | Serilog JSONL (CLEF) rolling daily to `%TEMP%\TempTrimmer\log-.jsonl` |
+| Default MaxTotalSizeMb | 256 (instance temp quota is shared by all apps/slots on the plan — default must be safe on dense plans) |
+| Default DryRun | `true`, but loud: dashboard banner + per-scan `Warning` log until armed |
+| Logging | Serilog JSONL (CLEF) rolling daily to `%TEMP%\TempTrimmer\log-.jsonl`, `retainedFileCountLimit: 7` (bounded even in dry-run) |
+| Package `Title` | ASCII only — non-ASCII is mangled to U+FFFD in the pack → NuGet → Kudu metadata chain |
 
 ### API Key authentication
 

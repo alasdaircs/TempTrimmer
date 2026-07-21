@@ -17,6 +17,21 @@
     <span class="text-muted small">Temp path: <code>@Model.Stats?.Path</code></span>
 </div>
 
+@if (isDryRun)
+{
+    <div class="alert alert-warning border-warning d-flex gap-3 mb-4" role="alert">
+        <span class="fs-3">&#9888;</span>
+        <div>
+            <strong>Dry-run mode is enabled — TempTrimmer is NOT deleting any files.</strong>
+            Your temp folder will keep growing until the trimmer is armed. Review the candidate
+            list below and adjust exclusions if needed, then disable dry-run on the
+            <a asp-page="/Config" class="alert-link">Configuration</a> page, or set the App
+            Setting <code>TempTrimmer__DryRun</code> to <code>false</code> (recommended — survives
+            upgrades and redeploys).
+        </div>
+    </div>
+}
+
 @if (TempData["Message"] is string msg)
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -107,15 +122,6 @@
 
         @if (isDryRun)
         {
-            <div class="alert alert-warning d-flex gap-2 mb-3 py-2" role="alert">
-                <span>&#9888;</span>
-                <span>
-                    <strong>Dry-run is enabled</strong> — no files will be deleted.
-                    Review the list below and adjust <a asp-page="/Config">exclusions</a> as needed,
-                    then disable dry-run mode when you are satisfied.
-                </span>
-            </div>
-
             @if (Model.DryRunPreview is { Count: > 0 } preview)
             {
                 <p class="text-muted small mb-2">

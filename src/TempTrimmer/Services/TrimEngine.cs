@@ -32,7 +32,10 @@ public sealed class TrimEngine
         if (options.DryRun)
         {
             deleted.AddRange(condemned.Values.Select(c => ToInfo(c.File, c.Reason)));
-            _logger.LogInformation("Dry-run complete. {Count} file(s) would be deleted.", deleted.Count);
+            _logger.LogWarning(
+                "DRY RUN: would have deleted {Count} file(s) ({SizeMb:F1} MB) — no files were deleted. " +
+                "Set TempTrimmer__DryRun=false (or disable dry-run on the Configuration page) to arm the trimmer.",
+                deleted.Count, deleted.Sum(f => f.SizeBytes) / 1_048_576.0);
         }
         else
         {

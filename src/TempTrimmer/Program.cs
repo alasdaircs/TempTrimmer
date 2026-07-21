@@ -1,6 +1,8 @@
 using AcsSolutions.TempTrimmer.Api;
 using AcsSolutions.TempTrimmer.Models;
 using AcsSolutions.TempTrimmer.Services;
+using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -12,6 +14,24 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+
+    // UI-saved settings live outside the extension folder (%HOME%\data on App Service) so they
+    // survive extension upgrades and ARM re-installs. Layered after the shipped appsettings.json
+    // but before environment variables, so App Settings (TempTrimmer__*) always win.
+    var uiSettingsPath = ConfigPersistenceService.GetSettingsFilePath(builder.Environment.ContentRootPath);
+    Directory.CreateDirectory(Path.GetDirectoryName(uiSettingsPath)!);
+    var uiSettingsSource = new JsonConfigurationSource
+    {
+        Path = Path.GetFileName(uiSettingsPath),
+        FileProvider = new PhysicalFileProvider(Path.GetDirectoryName(uiSettingsPath)!),
+        Optional = true,
+        ReloadOnChange = true,
+    };
+    var configSources = ((IConfigurationBuilder)builder.Configuration).Sources;
+    var insertAt = 0;
+    for (var i = 0; i < configSources.Count; i++)
+        if (configSources[i] is JsonConfigurationSource) insertAt = i + 1;
+    configSources.Insert(insertAt, uiSettingsSource);
 
     builder.Host.UseSerilog((ctx, _, lc) =>
     {
@@ -29,7 +49,9 @@ try
               new CompactJsonFormatter(),
               Path.Combine(logDir, "log-.jsonl"),
               rollingInterval: RollingInterval.Day,
-              retainedFileCountLimit: null,   // TrimEngine manages log file lifetime via the normal deletion policy
+              // Hard retention cap: in dry-run mode TrimEngine deletes nothing, so without this
+              // the tool's own logs would grow without bound.
+              retainedFileCountLimit: 7,
               shared: false);
     });
 
