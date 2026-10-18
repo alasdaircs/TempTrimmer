@@ -1,15 +1,32 @@
 version: 2
+
+# Security-only mode: version updates are off, security updates stay on.
+#
+# The weekly dependency routine (branch claude/dependency-updates) already bumps
+# every outdated package and action to the latest stable, so Dependabot's
+# version-update PRs duplicated that work and raced it — #27 auto-merged the
+# same xunit.runner.visualstudio bump the routine had open in #25, leaving #25
+# with an empty diff.
+#
+# open-pull-requests-limit: 0 disables version updates for an ecosystem.
+# Security updates are explicitly unaffected by the setting, so a published
+# advisory still raises a PR between routine runs, which is the part of
+# Dependabot the routine cannot replace.
+#
+# Note: dependabot-auto-merge.yml approves and auto-merges patch and minor
+# Dependabot PRs. Under this configuration the only PRs it can ever see are
+# security updates, so security patches now merge unreviewed.
 updates:
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
